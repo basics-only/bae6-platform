@@ -20,5 +20,7 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- end -}}
 
 {{- define "svc.multiReplica" -}}
-{{- if or .Values.autoscaling.enabled (gt (int .Values.replicas) 1) }}true{{ end -}}
+{{- /* A PDB at one replica would block node drains forever. */ -}}
+{{- $min := ternary .Values.autoscaling.minReplicas .Values.replicas .Values.autoscaling.enabled -}}
+{{- if gt (int $min) 1 }}true{{ end -}}
 {{- end -}}

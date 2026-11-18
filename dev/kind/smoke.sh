@@ -30,7 +30,7 @@ echo "ok: scaled to 3 replicas"
 [ "$(k get pods -l app.kubernetes.io/name=hello --field-selector=status.phase=Running -o name | wc -l | tr -d ' ')" = 3 ] || fail "expected 3 running pods"
 
 k delete pod probe --ignore-not-found --wait
-k run probe --image=curlimages/curl:8.11.1 --restart=Never --command -- sleep 3600
+k run probe --image=curlimages/curl:8.11.1 --labels=bae6-dev/probe=true --restart=Never --command -- sleep 3600
 k wait --for=condition=Ready pod/probe --timeout=90s
 
 TOKEN=$(in_probe "curl -sf -X POST http://mock-oidc/token -d '{\"sub\":\"alice\",\"aud\":\"hello\",\"ttlSeconds\":900}'" | sed -E 's/.*"access_token":"([^"]+)".*/\1/')

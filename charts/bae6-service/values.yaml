@@ -55,6 +55,14 @@ networkPolicy:
   # Pods allowed to call this runtime, as NetworkPolicyPeer entries.
   # Empty = only pods in the same namespace.
   ingressFrom: []
+  # The cluster DNS pods (NetworkPolicyPeer entries). Override for clusters whose DNS differs.
+  dnsTo:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
   # Allowed egress beyond DNS, as NetworkPolicyEgressRule entries.
   egress: []
 

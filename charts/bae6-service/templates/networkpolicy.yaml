@@ -19,7 +19,9 @@ spec:
         - podSelector: {}
         {{- end }}
   egress:
-    - ports:
+    # DNS only to the cluster resolver, so port 53 is not an exfiltration path.
+    - to: {{- toYaml .Values.networkPolicy.dnsTo | nindent 8 }}
+      ports:
         - port: 53
           protocol: UDP
         - port: 53

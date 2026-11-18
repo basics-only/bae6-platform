@@ -20,7 +20,7 @@ const INVALID = new Set([
 /**
  * @param {{issuer:string,audience:string,jwksUri:string,organization:string,application:string}[]} issuers
  *   Trusted issuers and the tenant each maps to (ADR-0002). Never taken from token claims.
- * @param {{allowHttpJwks?: boolean}} [opts] http JWKS for in-cluster dev issuers only.
+ * @param {{allowHttpJwks?: boolean}} [opts] http JWKS (tests, dev clusters); main.mjs refuses it in production.
  * @returns {(authorization: string|undefined) => Promise<object|null>} null = invalid; throws = undeterminable.
  */
 export function createVerifier(issuers, opts = {}) {
@@ -31,8 +31,7 @@ export function createVerifier(issuers, opts = {}) {
       throw new Error(`issuer ${i.issuer}: organization and application must be slugs`);
     }
     const jwks = new URL(i.jwksUri);
-    const local = jwks.hostname === "localhost" || jwks.hostname === "127.0.0.1";
-    if (jwks.protocol !== "https:" && !(jwks.protocol === "http:" && (local || opts.allowHttpJwks))) {
+    if (jwks.protocol !== "https:" && !(jwks.protocol === "http:" && opts.allowHttpJwks)) {
       throw new Error(`issuer ${i.issuer}: jwksUri must be https`);
     }
     if (byIssuer.has(i.issuer)) throw new Error(`duplicate issuer ${i.issuer}`);
@@ -68,6 +67,8 @@ export function createVerifier(issuers, opts = {}) {
       throw err;
     }
     if (typeof payload.sub !== "string" || payload.sub === "" || payload.sub.length > 256) return null;
+    // jose checks iat only with maxTokenAge; the style guide also rejects a future iat.
+    if (typeof payload.iat === "number" && payload.iat > Date.now() / 1000 + 60) return null;
     const scopes = typeof payload.scope === "string" ? payload.scope.split(" ").filter(Boolean)
       : Array.isArray(payload.scp) ? payload.scp.filter((s) => typeof s === "string") : [];
     return {

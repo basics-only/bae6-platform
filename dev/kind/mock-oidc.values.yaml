@@ -6,5 +6,14 @@ replicas: 1
 env:
   NODE_ENV: development
   MOCK_OIDC_ISSUER: http://mock-oidc.bae6-dev.svc.cluster.local
+# Anyone who reaches /token can mint any identity: only hello (JWKS) and the smoke probe may.
+networkPolicy:
+  ingressFrom:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: hello
+    - podSelector:
+        matchLabels:
+          bae6-dev/probe: "true"
 probes:
   readinessPath: /health/live

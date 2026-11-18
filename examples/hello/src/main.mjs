@@ -11,7 +11,8 @@ function config(env) {
   const allowHttpJwks = env.HELLO_ALLOW_HTTP_JWKS === "true";
   if (allowHttpJwks && env.NODE_ENV === "production") throw new Error("HELLO_ALLOW_HTTP_JWKS is for development clusters only");
   const drainMs = Number(env.HELLO_DRAIN_MS ?? 5000);
-  if (!Number.isInteger(drainMs) || drainMs < 0 || drainMs > 60_000) throw new Error("HELLO_DRAIN_MS must be 0-60000");
+  // Drain + the 10 s hard stop must fit the chart's 30 s terminationGracePeriodSeconds.
+  if (!Number.isInteger(drainMs) || drainMs < 0 || drainMs > 15_000) throw new Error("HELLO_DRAIN_MS must be 0-15000");
   return { issuers, allowHttpJwks, drainMs, port: Number(env.PORT ?? 8080) };
 }
 

@@ -18,11 +18,11 @@ before(async () => {
   jwksServer = createServer((_, res) => res.end(JSON.stringify({ keys: [jwk] })));
   const jwksUri = `${await listen(jwksServer)}/jwks`;
   const issuers = [{ issuer: ISS, audience: AUD, jwksUri, organization: "acme", application: "crm" }];
-  hello = createHello({ verify: createVerifier(issuers) });
+  hello = createHello({ verify: createVerifier(issuers, { allowHttpJwks: true }) });
   base = await listen(hello);
   // Same config, but the JWKS endpoint refuses connections.
   const dead = [{ ...issuers[0], jwksUri: "http://127.0.0.1:9/jwks" }];
-  downHello = createHello({ verify: createVerifier(dead) });
+  downHello = createHello({ verify: createVerifier(dead, { allowHttpJwks: true }) });
   downBase = await listen(downHello);
 });
 
@@ -72,6 +72,9 @@ const rejected = {
   "HS256 with a guessable secret": () =>
     new SignJWT({ sub: "alice" }).setProtectedHeader({ alg: "HS256", kid: "k1" }).setIssuer(ISS).setAudience(AUD)
       .setExpirationTime("5m").sign(new TextEncoder().encode("secret")),
+  "issued in the future beyond skew": () =>
+    new SignJWT({ sub: "alice" }).setProtectedHeader({ alg: "RS256", kid: "k1" }).setIssuer(ISS).setAudience(AUD)
+      .setIssuedAt(now() + 3600).setExpirationTime(now() + 7200).sign(key.privateKey),
   "no subject": () =>
     new SignJWT({}).setProtectedHeader({ alg: "RS256", kid: "k1" }).setIssuer(ISS).setAudience(AUD).setExpirationTime("5m").sign(key.privateKey),
 };
@@ -85,6 +88,11 @@ for (const [name, make] of Object.entries(rejected)) {
     assert.equal(body.requestId, res.headers.get("x-request-id"));
   });
 }
+
+test("an http JWKS is refused unless explicitly allowed", () => {
+  const issuer = { issuer: ISS, audience: AUD, jwksUri: "http://127.0.0.1/jwks", organization: "acme", application: "crm" };
+  assert.throws(() => createVerifier([issuer]), /must be https/);
+});
 
 test("an unreachable JWKS fails closed with 503, not an allow", async () => {
   const res = await get(await sign(), { url: downBase });
