@@ -1,0 +1,14 @@
+{
+  "name": "@bae6/mock-oidc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "server.mjs",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "jose": "6.2.14"
+  }
+}

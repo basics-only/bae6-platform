@@ -1,0 +1,69 @@
+# Defaults for one runtime. Product repos ship their own deploy/values.yaml on top of these.
+image:
+  repository: ""
+  # Required: deploy by immutable digest (sha256:...).
+  digest: ""
+  # Development clusters only (e.g. kind-loaded images): set allowTag and tag instead of digest.
+  allowTag: false
+  tag: ""
+  pullPolicy: IfNotPresent
+
+containerPort: 8080
+
+# Ignored when autoscaling.enabled.
+replicas: 2
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Plain environment values. Secrets go in envFromSecrets, never here.
+env: {}
+# Each item: {name: ENV_NAME, secret: secret-name, key: key-in-secret}
+envFromSecrets: []
+
+probes:
+  livenessPath: /health/live
+  readinessPath: /health/ready
+  # Startup allows failureThreshold × periodSeconds for migrations and warm-up.
+  startupFailureThreshold: 30
+
+# Must exceed the app's drain delay plus its longest request.
+terminationGracePeriodSeconds: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+serviceAccount:
+  # Workload identity: e.g. eks.amazonaws.com/role-arn or iam.gke.io/gcp-service-account.
+  annotations: {}
+  # Off unless the runtime calls the Kubernetes API or needs a projected token.
+  automountToken: false
+
+podDisruptionBudget:
+  # Applied when more than one replica can run.
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  # Pods allowed to call this runtime, as NetworkPolicyPeer entries.
+  # Empty = only pods in the same namespace.
+  ingressFrom: []
+  # The cluster DNS pods (NetworkPolicyPeer entries). Override for clusters whose DNS differs.
+  dnsTo:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  # Allowed egress beyond DNS, as NetworkPolicyEgressRule entries.
+  egress: []
+
+podAnnotations: {}
