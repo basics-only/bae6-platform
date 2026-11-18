@@ -1,0 +1,21 @@
+image:
+  repository: bae6/hello
+  allowTag: true
+  tag: dev
+replicas: 3
+env:
+  NODE_ENV: development
+  HELLO_ALLOW_HTTP_JWKS: "true"
+  HELLO_DRAIN_MS: "3000"
+  HELLO_ISSUERS: >-
+    [{"issuer":"http://mock-oidc.bae6-dev.svc.cluster.local","audience":"hello",
+      "jwksUri":"http://mock-oidc.bae6-dev.svc.cluster.local/.well-known/jwks.json",
+      "organization":"acme","application":"demo"}]
+networkPolicy:
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mock-oidc
+      ports:
+        - port: 8080

@@ -1,0 +1,10 @@
+image:
+  repository: bae6/mock-oidc
+  allowTag: true
+  tag: dev
+replicas: 1
+env:
+  NODE_ENV: development
+  MOCK_OIDC_ISSUER: http://mock-oidc.bae6-dev.svc.cluster.local
+probes:
+  readinessPath: /health/live

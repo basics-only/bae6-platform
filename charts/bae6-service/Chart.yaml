@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bae6-service
+description: Hardened chart for one bae6 runtime. Install once per runtime (ADR-0008).
+type: application
+version: 0.1.0
+kubeVersion: ">=1.29.0-0"

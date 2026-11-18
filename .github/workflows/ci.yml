@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/bae6-service -f dev/kind/hello.values.yaml
+      # Without allowTag, a tag instead of a digest must be refused.
+      - run: "! helm template x charts/bae6-service --set image.repository=r --set image.tag=latest"
+      - run: helm template hello charts/bae6-service -f dev/kind/hello.values.yaml --set autoscaling.enabled=true --output-dir rendered
+      - run: docker run --rm -v "$PWD/rendered:/m:ro" ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary -kubernetes-version 1.31.0 /m
+
+  kind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: bae6-dev
+      - run: dev/kind/smoke.sh
+      - if: failure()
+        run: kubectl -n bae6-dev get pods -o wide && kubectl -n bae6-dev logs -l app.kubernetes.io/name=hello --tail 30
