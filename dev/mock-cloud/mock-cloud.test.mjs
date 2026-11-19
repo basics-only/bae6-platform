@@ -12,8 +12,9 @@ before(async () => {
     env: {
       ...process.env,
       PORT: String(port),
+      MOCK_CLOUD: "1",
       MOCK_EMBED_DIMENSIONS: "16",
-      MOCK_S3_OBJECTS: JSON.stringify({ b: { "a/one.txt": "hello world", "a/two.txt": "second", "z/other.txt": "x" } }),
+      MOCK_S3_OBJECTS: JSON.stringify({ b: { "a/one.txt": "hello world", "a/two.txt": "second", "a/with space é.txt": "third", "z/other.txt": "x" } }),
     },
   });
   for (let i = 0; i < 50; i++) {
@@ -44,6 +45,24 @@ test("lists only keys under the prefix and reads them back", async () => {
   const part = await fetch(`${base}/b/a/one.txt`, { headers: { range: "bytes=0-4" } });
   assert.equal(part.status, 206);
   assert.equal(await part.text(), "hello");
+});
+
+test("pages through keys with an opaque cursor even when keys need escaping", async () => {
+  const keys = [];
+  let cursor;
+  do {
+    const query = `list-type=2&prefix=a/&max-keys=1${cursor ? `&continuation-token=${cursor}` : ""}`;
+    const xml = await (await fetch(`${base}/b?${query}`)).text();
+    keys.push(...[...xml.matchAll(/<Key>([^<]*)<\/Key>/g)].map((m) => m[1]));
+    cursor = xml.match(/<NextContinuationToken>([^<]*)</)?.[1];
+    assert.ok(cursor === undefined || /^[\x21-\x7e]+$/.test(cursor));
+  } while (cursor);
+  assert.equal(keys.length, 3);
+});
+
+test("refuses a range that starts past the end and a zero page size", async () => {
+  assert.equal((await fetch(`${base}/b/a/one.txt`, { headers: { range: "bytes=50-60" } })).status, 416);
+  assert.equal((await fetch(`${base}/b?list-type=2&max-keys=0`)).status, 400);
 });
 
 test("answers missing objects with 404", async () => {

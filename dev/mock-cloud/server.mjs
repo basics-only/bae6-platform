@@ -1,12 +1,17 @@
 // Development-only stand-in for Bedrock (converse, invoke) and S3 (list, get, head). It does not
-// check signatures, so it refuses production and must never be exposed.
+// check signatures, so it only starts when MOCK_CLOUD=1 and must never be exposed.
+// Not mocked: converse-stream, object versions.
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
-if (process.env.NODE_ENV === "production") throw new Error("mock-cloud must not run in production");
+if (process.env.MOCK_CLOUD !== "1") throw new Error("mock-cloud needs MOCK_CLOUD=1; it must never run outside development");
 const dimensions = Number(process.env.MOCK_EMBED_DIMENSIONS ?? 64);
+if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > 4096) throw new Error("MOCK_EMBED_DIMENSIONS must be an integer from 1 to 4096");
 // {"bucket": {"key": "text"}}
 const buckets = JSON.parse(process.env.MOCK_S3_OBJECTS ?? "{}");
+for (const objects of Object.values(buckets)) {
+  for (const text of Object.values(objects)) if (typeof text !== "string") throw new Error("MOCK_S3_OBJECTS values must be strings");
+}
 const modified = new Date().toUTCString();
 
 const etag = (text) => `"${createHash("md5").update(text).digest("hex")}"`;
@@ -25,6 +30,7 @@ function embed(text) {
 
 async function json(req) {
   let raw = "";
+  req.setEncoding("utf8");
   for await (const chunk of req) {
     raw += chunk;
     if (raw.length > 1_000_000) throw new Error("too large");
@@ -59,20 +65,22 @@ createServer(async (req, res) => {
     }
 
     const [, bucket, ...rest] = decodeURIComponent(url.pathname).split("/");
-    const objects = buckets[bucket];
+    const objects = Object.hasOwn(buckets, bucket) ? buckets[bucket] : undefined;
     if (req.method !== "GET" && req.method !== "HEAD") return reply(405, { message: "method not allowed" });
     if (!objects) return xml(404, "<Error><Code>NoSuchBucket</Code></Error>");
 
     if (rest.length === 0) {
       const prefix = url.searchParams.get("prefix") ?? "";
-      const max = Math.min(Number(url.searchParams.get("max-keys") ?? 1000), 1000);
-      const after = url.searchParams.get("continuation-token") ?? "";
+      const max = Number(url.searchParams.get("max-keys") ?? 1000);
+      if (!Number.isInteger(max) || max < 1) return xml(400, "<Error><Code>InvalidArgument</Code></Error>");
+      const token = url.searchParams.get("continuation-token");
+      const after = token === null ? "" : Buffer.from(token, "base64url").toString("utf8");
       const keys = Object.keys(objects).filter((k) => k.startsWith(prefix) && k > after).sort();
-      const page = keys.slice(0, max);
+      const page = keys.slice(0, Math.min(max, 1000));
       const more = keys.length > page.length;
       return xml(
         200,
-        `<ListBucketResult><IsTruncated>${more}</IsTruncated>${more ? `<NextContinuationToken>${esc(page.at(-1))}</NextContinuationToken>` : ""}${page
+        `<ListBucketResult><IsTruncated>${more}</IsTruncated>${more ? `<NextContinuationToken>${Buffer.from(page.at(-1)).toString("base64url")}</NextContinuationToken>` : ""}${page
           .map(
             (k) =>
               `<Contents><Key>${esc(k)}</Key><LastModified>${new Date(modified).toISOString()}</LastModified><ETag>${esc(etag(objects[k]))}</ETag><Size>${Buffer.byteLength(objects[k])}</Size></Contents>`,
@@ -89,6 +97,7 @@ createServer(async (req, res) => {
     if (range) {
       const start = Number(range[1]);
       const end = Math.min(Number(range[2]), data.length - 1);
+      if (start > end) return xml(416, "<Error><Code>InvalidRange</Code></Error>", { "content-range": `bytes */${data.length}` });
       const part = data.subarray(start, end + 1);
       res.writeHead(206, { ...headers, "content-length": part.length, "content-range": `bytes ${start}-${end}/${data.length}` });
       return res.end(req.method === "HEAD" ? undefined : part);
