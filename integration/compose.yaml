@@ -1,0 +1,155 @@
+name: bae6-integration
+
+x-dev: &dev
+  NODE_ENV: development
+  BAE6_ALLOW_HTTP_JWKS: "true"
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_PASSWORD: dev-only-admin
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mock-oidc:
+    image: ${BAE6_MOCK_OIDC_IMAGE:-localhost/bae6-mock-oidc:dev}
+    environment:
+      NODE_ENV: development
+      MOCK_OIDC_ISSUER: http://mock-oidc:8080
+    ports:
+      - "127.0.0.1:8085:8080"
+
+  mock-oidc-other:
+    image: ${BAE6_MOCK_OIDC_IMAGE:-localhost/bae6-mock-oidc:dev}
+    environment:
+      NODE_ENV: development
+      MOCK_OIDC_ISSUER: http://mock-oidc-other:8080
+    ports:
+      - "127.0.0.1:8086:8080"
+
+  mock-cloud:
+    image: ${BAE6_MOCK_CLOUD_IMAGE:-localhost/bae6-mock-cloud:dev}
+    environment:
+      MOCK_CLOUD: "1"
+      MOCK_EMBED_DIMENSIONS: "64"
+      MOCK_S3_OBJECTS: >-
+        {"docs":{
+        "example/handbook.txt":"Expense reports are reimbursed within ten business days of approval.",
+        "example/security.txt":"Production access requires a ticket and a second reviewer.",
+        "other/private.txt":"Not part of the example organization."}}
+
+  token-minter:
+    image: docker.io/curlimages/curl:8.11.1
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          if body=$$(curl -sf -X POST http://mock-oidc:8080/token \
+            -d '{"sub":"embed-worker","aud":"bae6-ai","scope":"ai:invoke","ttlSeconds":900}'); then
+            echo "$$body" | sed -E 's/.*"access_token":"([^"]+)".*/\1/' > /tokens/ai.tmp
+            mv /tokens/ai.tmp /tokens/ai
+            sleep 300
+          else
+            sleep 1
+          fi
+        done
+    user: "0"
+    volumes:
+      - tokens:/tokens
+    healthcheck:
+      test: ["CMD", "test", "-s", "/tokens/ai"]
+      interval: 1s
+      timeout: 2s
+      retries: 60
+    depends_on:
+      - mock-oidc
+
+  ai-gateway:
+    image: ${BAE6_AI_GATEWAY_IMAGE:-localhost/bae6-ai-gateway:dev}
+    environment:
+      <<: *dev
+      BAE6_ALLOW_CUSTOM_PROVIDER_ENDPOINTS: "true"
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      BAE6_DATABASE_URL: postgres://ai:dev-only-ai@postgres:5432/ai
+      BAE6_AI_ISSUERS: >-
+        [{"issuer":"http://mock-oidc:8080","audience":"bae6-ai","jwksUri":"http://mock-oidc:8080/.well-known/jwks.json","organization":"example","application":"demo"}]
+      BAE6_AI_CONFIG: >-
+        {"priceBook":{"version":"integration","prices":{
+        "chat-mock":{"inputPerMTok":"3","outputPerMTok":"15"},
+        "embed-mock":{"inputPerMTok":"0.1","outputPerMTok":"0"}}},
+        "models":[
+        {"id":"chat-mock","provider":"bedrock","providerModel":"mock.chat-v1","region":"us-east-1","endpoint":"http://mock-cloud:8080","operations":["chat"],"inputModalities":["text"],"maxInputTokens":8000,"maxOutputTokens":1000},
+        {"id":"embed-mock","provider":"bedrock","providerModel":"mock.embed-v1","region":"us-east-1","endpoint":"http://mock-cloud:8080","operations":["embed"],"inputModalities":["text"],"maxInputTokens":8000,"maxOutputTokens":1}],
+        "budgets":{"example":"100"}}
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      postgres: {condition: service_healthy}
+      mock-oidc: {condition: service_started}
+      mock-cloud: {condition: service_started}
+
+  data-api:
+    image: ${BAE6_CONTEXT_DATA_API_IMAGE:-localhost/bae6-context-data-api:dev}
+    environment:
+      <<: *dev
+      BAE6_ALLOW_HTTP_SOURCES: "true"
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      BAE6_DATA_ISSUERS: >-
+        [{"issuer":"http://mock-oidc:8080","audience":"bae6-context-data","jwksUri":"http://mock-oidc:8080/.well-known/jwks.json","organization":"example","application":"demo"},{"issuer":"http://mock-oidc-other:8080","audience":"bae6-context-data","jwksUri":"http://mock-oidc-other:8080/.well-known/jwks.json","organization":"other","application":"demo"}]
+      BAE6_DATA_CONFIG: >-
+        {"sources":[{"id":"docs","organization":"example","kind":"s3","region":"us-east-1","bucket":"docs","prefix":"example/","endpoint":"http://mock-cloud:8080"}]}
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on:
+      mock-oidc: {condition: service_started}
+      mock-cloud: {condition: service_started}
+
+  embed-api:
+    image: ${BAE6_CONTEXT_EMBED_API_IMAGE:-localhost/bae6-context-embed-api:dev}
+    environment:
+      <<: *dev
+      BAE6_ALLOW_HTTP_SOURCES: "true"
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      BAE6_EMBED_DATABASE_URL: postgres://embed:dev-only-embed@postgres:5432/embed
+      BAE6_AI_URL: http://ai-gateway:8080
+      BAE6_AI_TOKEN_FILE: /tokens/ai
+      BAE6_EMBED_ISSUERS: >-
+        [{"issuer":"http://mock-oidc:8080","audience":"bae6-context-embed","jwksUri":"http://mock-oidc:8080/.well-known/jwks.json","organization":"example","application":"demo"},{"issuer":"http://mock-oidc-other:8080","audience":"bae6-context-embed","jwksUri":"http://mock-oidc-other:8080/.well-known/jwks.json","organization":"other","application":"demo"}]
+      BAE6_EMBED_CONFIG: >-
+        {"collections":[{"id":"kb","organization":"example","model":{"id":"embed-mock","dimensions":64},
+        "source":{"region":"us-east-1","bucket":"docs","prefix":"example/","endpoint":"http://mock-cloud:8080"},
+        "acl":[{"prefix":"","principals":["user:alice"]}]}]}
+    volumes:
+      - tokens:/tokens:ro
+    ports:
+      - "127.0.0.1:8083:8080"
+    depends_on:
+      postgres: {condition: service_healthy}
+      ai-gateway: {condition: service_started}
+      token-minter: {condition: service_healthy}
+      mock-cloud: {condition: service_started}
+
+  mcp-registry:
+    image: ${BAE6_CONTEXT_MCP_REGISTRY_IMAGE:-localhost/bae6-context-mcp-registry:dev}
+    environment:
+      <<: *dev
+      BAE6_MCP_DATABASE_URL: postgres://mcp:dev-only-mcp@postgres:5432/mcp
+      BAE6_MCP_ISSUERS: >-
+        [{"issuer":"http://mock-oidc:8080","audience":"bae6-context-mcp","jwksUri":"http://mock-oidc:8080/.well-known/jwks.json","organization":"example","application":"demo"}]
+    ports:
+      - "127.0.0.1:8084:8080"
+    depends_on:
+      postgres: {condition: service_healthy}
+      mock-oidc: {condition: service_started}
+
+volumes:
+  tokens:

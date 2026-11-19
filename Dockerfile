@@ -8,6 +8,7 @@ WORKDIR /src
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY ${APP}/package.json ${APP}/
 RUN pnpm install --frozen-lockfile --prod --filter "./${APP}"
+RUN mkdir -p "${APP}/node_modules"
 
 FROM ${NODE}
 ARG APP
