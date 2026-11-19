@@ -38,6 +38,7 @@ Measured on the hardened images (gateway v0.1.4, context v0.1.2; the demo was re
 
 - Hard kill of the gateway: ready in 3 s, spend preserved, no leaked reservations, demo passes.
 - Gateway image v0.1.0 on v0.1.1 config: starts, ignores `endpoint` silently and would call real Bedrock (observed as a 502 against mock credentials). Revert config before image. Not re-run against v0.1.4.
+- kind (podman provider), mcp-registry v0.1.4 with its shipped values on the chart, one throwaway Postgres: 2 replicas ready, unauthenticated call 401, a new pod that crashed on an invalid setting left both old replicas serving, `helm rollback` restored revision 1. The other services were not deployed to a cluster; the pods restarted twice before Postgres accepted connections, which is the intended fail-fast.
 
 ## Security review
 
@@ -46,7 +47,7 @@ Read-only review of tenant isolation, issuer-to-org binding, token handling, SSR
 | Finding | Status |
 |---|---|
 | F1 gateway dev flags fail open | Fixed in bae6-ai v0.1.2, regression test in `main.test.ts` |
-| F2 gateway has no per-org in-flight limit or body deadline | Fixed in bae6-ai v0.1.4. The per-org cap is off until `BAE6_MAX_INFLIGHT_PER_ORG` is set; the 15 s idle body deadline is always on |
+| F2 gateway has no per-org in-flight limit or body deadline | Fixed in bae6-ai v0.1.4. The per-org cap defaults to the global limit, and the shipped `deploy/values.yaml` sets it to 32; the 15 s idle body deadline is always on |
 | F3 mcp-registry has no host allowlist by default | Fixed in bae6-context v0.1.2: refuses to start without `BAE6_MCP_ALLOWED_HOST_SUFFIXES` unless the dev flag is set |
 | F4 chart egress default is empty | Accepted, deny by default |
 | F5 integration images not digest-pinned | Accepted, dev only |
