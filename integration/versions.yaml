@@ -13,19 +13,19 @@ runtimes:
     localImageId: 28701c7e4f73
   bae6-context-data-api:
     repo: bae6-context
-    version: v0.1.2
-    commit: babad131a7b97f8d0dbc1cd54f2cd3af0c19ae36
-    localImageId: 32a92477b3a6
+    version: v0.1.3
+    commit: 4cf26aa6fea22091000b7801ffd93003c43f416d
+    localImageId: 4e9491ae896c
   bae6-context-embed-api:
     repo: bae6-context
-    version: v0.1.2
-    commit: babad131a7b97f8d0dbc1cd54f2cd3af0c19ae36
-    localImageId: 345c1c558f0e
+    version: v0.1.3
+    commit: 4cf26aa6fea22091000b7801ffd93003c43f416d
+    localImageId: 8f9c8cc081d6
   bae6-context-mcp-registry:
     repo: bae6-context
-    version: v0.1.2
-    commit: babad131a7b97f8d0dbc1cd54f2cd3af0c19ae36
-    localImageId: 33ee28996d8b
+    version: v0.1.3
+    commit: 4cf26aa6fea22091000b7801ffd93003c43f416d
+    localImageId: 0022a41ae1cc
 chart:
   name: bae6-service
   version: 0.1.0
