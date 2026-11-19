@@ -142,6 +142,7 @@ services:
     image: ${BAE6_CONTEXT_MCP_REGISTRY_IMAGE:-localhost/bae6-context-mcp-registry:dev}
     environment:
       <<: *dev
+      BAE6_MCP_ALLOW_INSECURE_ENDPOINTS: "true"
       BAE6_MCP_DATABASE_URL: postgres://mcp:dev-only-mcp@postgres:5432/mcp
       BAE6_MCP_ISSUERS: >-
         [{"issuer":"http://mock-oidc:8080","audience":"bae6-context-mcp","jwksUri":"http://mock-oidc:8080/.well-known/jwks.json","organization":"example","application":"demo"}]
