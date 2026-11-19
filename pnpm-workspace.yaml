@@ -1,3 +1,4 @@
 packages:
   - examples/*
   - dev/mock-oidc
+  - dev/mock-cloud
