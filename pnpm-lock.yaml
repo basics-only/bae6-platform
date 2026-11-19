@@ -8,6 +8,8 @@ importers:
 
   .: {}
 
+  dev/mock-cloud: {}
+
   dev/mock-oidc:
     dependencies:
       jose:
