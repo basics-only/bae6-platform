@@ -8,9 +8,9 @@ runtimes:
     localImageId: 07d7edb3ec35
   bae6-ai-gateway:
     repo: bae6-ai
-    version: v0.1.1
-    commit: 7311e5b6054e7d4e87f8fa715e8b3b38a63296eb
-    localImageId: f4111ef6d5d4
+    version: v0.1.2
+    commit: 88b3302735a616e648dde719e38779ab3672a2b0
+    localImageId: 5454533b90cb
   bae6-context-data-api:
     repo: bae6-context
     version: v0.1.0
