@@ -1,0 +1,12 @@
+{
+  "name": "@bae6/mock-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "server.mjs",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  }
+}
