@@ -9,9 +9,9 @@ Pinned in `integration/versions.yaml`.
 | Runtime | Version | Image |
 |---|---|---|
 | bae6-ai-gateway | v0.1.4 | 164 MB |
-| bae6-context-data-api | v0.1.2 | 164 MB |
-| bae6-context-embed-api | v0.1.2 | 164 MB |
-| bae6-context-mcp-registry | v0.1.2 | 164 MB |
+| bae6-context-data-api | v0.1.3 | 164 MB |
+| bae6-context-embed-api | v0.1.3 | 164 MB |
+| bae6-context-mcp-registry | v0.1.3 | 164 MB |
 | bae6-authz-api | v0.1.0 | ~500 MB (not in the integration stack) |
 
 Contracts v0.1.0. Chart `bae6-service` 0.1.0.
@@ -32,7 +32,7 @@ Search and read answer most requests with 429, the services' per-organization ad
 | search | 23322 | 250 | 33 / 56 / 73 | 2509 x 200, 20813 x 429 |
 | read | 34649 | 2703 | 4 / 10 / 17 | 27048 x 200, 7601 x 429 |
 
-Measured on the hardened images (gateway v0.1.4, context v0.1.2). An earlier run on the previous images gave chat 412 rps; the difference is likely laptop load rather than the releases, and was not repeated.
+Measured on the hardened images (gateway v0.1.4, context v0.1.2; the demo was re-run on context v0.1.3, the load was not). An earlier run on the previous images gave chat 412 rps; the difference is likely laptop load rather than the releases, and was not repeated.
 
 ## Rollback drills
 
