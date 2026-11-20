@@ -30,6 +30,7 @@ jobs:
       # Without allowTag, a tag instead of a digest must be refused.
       - run: "! helm template x charts/bae6-service --set image.repository=r --set image.tag=latest"
       - run: "! helm template x charts/bae6-service -f dev/kind/hello.values.yaml --set webIdentity.roleArn=not-an-arn"
+      - run: "! helm template x charts/bae6-service -f dev/kind/hello.values.yaml --set webIdentity.roleArn=arn:aws:iam::123456789012:role/x --set env.AWS_ROLE_ARN=y"
       - run: helm template hello charts/bae6-service -f dev/kind/hello.values.yaml --set autoscaling.enabled=true --set webIdentity.roleArn=arn:aws:iam::123456789012:role/hello --output-dir rendered
       - run: docker run --rm -v "$PWD/rendered:/m:ro" ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary -kubernetes-version 1.31.0 /m
 

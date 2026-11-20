@@ -1,3 +1,15 @@
+{{- if .Values.webIdentity.roleArn }}
+{{- range $reserved := list "AWS_ROLE_ARN" "AWS_WEB_IDENTITY_TOKEN_FILE" }}
+{{- if hasKey $.Values.env $reserved }}
+{{- fail (printf "%s is set by webIdentity.roleArn; remove it from env" $reserved) }}
+{{- end }}
+{{- range $.Values.envFromSecrets }}
+{{- if eq .name $reserved }}
+{{- fail (printf "%s is set by webIdentity.roleArn; remove it from envFromSecrets" $reserved) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
