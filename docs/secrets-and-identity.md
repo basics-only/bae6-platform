@@ -16,8 +16,12 @@
 - `automountServiceAccountToken` is off unless a runtime needs a projected token.
 
 ## Secrets
-- Values that are secret (database URLs with passwords, provider keys where workload
-  identity is not available) go in Kubernetes Secrets, referenced through
+- Cloud provider credentials are never stored: not in Secrets, values, or images. The
+  ai-gateway gets them from workload identity (EKS Pod Identity or IRSA; GKE Workload
+  Identity for Vertex). Static AWS keys work only locally, from a `.env`, under
+  `NODE_ENV=development`; the gateway refuses to start with them anywhere else
+  (bae6-contracts ADR-0013).
+- Values that are secret (database URLs with passwords) go in Kubernetes Secrets, referenced through
   `envFromSecrets`. They are never put in `env`, ConfigMaps, values files in git, or images.
 - In production, Secrets are synced from the cloud secret manager (External Secrets
   Operator, or the CSI secrets driver). bae6 does not require either; pick one per cluster.
