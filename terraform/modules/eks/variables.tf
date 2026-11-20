@@ -47,8 +47,25 @@ variable "database" {
     multi_az              = optional(bool, false)
     backup_retention_days = optional(number, 7)
     deletion_protection   = optional(bool, true)
+    final_snapshot_name   = optional(string)
   })
   default = {}
+
+  validation {
+    condition     = var.database.max_allocated_storage > var.database.allocated_storage && var.database.backup_retention_days >= 1
+    error_message = "max_allocated_storage must exceed allocated_storage and backups must be kept at least one day."
+  }
+}
+
+variable "secret_recovery_window_days" {
+  description = "Days a deleted secret can be restored; 0 deletes at once, which lets a torn-down environment be recreated the same day."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.secret_recovery_window_days == 0 || (var.secret_recovery_window_days >= 7 && var.secret_recovery_window_days <= 30)
+    error_message = "Use 0, or 7 to 30 days."
+  }
 }
 
 variable "runtimes" {
@@ -64,9 +81,14 @@ variable "runtimes" {
   validation {
     condition = alltrue([
       for r in values(var.runtimes) :
-      alltrue([for arn in r.bedrock_model_arns : !strcontains(arn, "*")])
+      alltrue([for arn in r.bedrock_model_arns : !strcontains(arn, "*") && !strcontains(arn, "?")])
     ])
     error_message = "Bedrock model ARNs must be exact; wildcards are not allowed."
+  }
+
+  validation {
+    condition     = alltrue([for r in values(var.runtimes) : length(r.secret_names) == length(toset(r.secret_names))])
+    error_message = "A runtime's secret_names must not repeat."
   }
 }
 

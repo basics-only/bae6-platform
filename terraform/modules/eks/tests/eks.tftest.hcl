@@ -133,3 +133,54 @@ run "a_database_without_clients_is_refused" {
 
   expect_failures = [var.database_client_security_group_ids]
 }
+
+run "single_character_wildcards_in_model_arns_are_refused_too" {
+  command = plan
+
+  variables {
+    runtimes = {
+      ai-gateway = {
+        namespace          = "bae6"
+        bedrock_model_arns = ["arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-?"]
+      }
+    }
+  }
+
+  expect_failures = [var.runtimes]
+}
+
+run "repeated_secret_names_are_refused" {
+  command = plan
+
+  variables {
+    runtimes = {
+      ai-gateway = { namespace = "bae6", secret_names = ["database-url", "database-url"] }
+    }
+  }
+
+  expect_failures = [var.runtimes]
+}
+
+run "impossible_storage_or_backup_settings_are_refused_before_apply" {
+  command = plan
+
+  variables {
+    database = { allocated_storage = 200 }
+  }
+
+  expect_failures = [var.database]
+}
+
+run "a_second_teardown_can_name_its_own_final_snapshot_and_secrets_can_be_deleted_at_once" {
+  command = apply
+
+  variables {
+    database                    = { final_snapshot_name = "bae6-final-2" }
+    secret_recovery_window_days = 0
+  }
+
+  assert {
+    condition     = aws_db_instance.this.final_snapshot_identifier == "bae6-final-2" && aws_secretsmanager_secret.this["ai-gateway/database-url"].recovery_window_in_days == 0
+    error_message = "The final snapshot name and the secret recovery window must be configurable."
+  }
+}

@@ -47,26 +47,25 @@ resource "aws_vpc_security_group_ingress_rule" "database" {
 }
 
 resource "aws_db_instance" "this" {
-  identifier                          = var.name
-  engine                              = "postgres"
-  engine_version                      = var.database.engine_version
-  instance_class                      = var.database.instance_class
-  allocated_storage                   = var.database.allocated_storage
-  max_allocated_storage               = var.database.max_allocated_storage
-  storage_encrypted                   = true
-  multi_az                            = var.database.multi_az
-  backup_retention_period             = var.database.backup_retention_days
-  deletion_protection                 = var.database.deletion_protection
-  skip_final_snapshot                 = false
-  final_snapshot_identifier           = "${var.name}-final"
-  publicly_accessible                 = false
-  username                            = "bae6_admin"
-  manage_master_user_password         = true
-  iam_database_authentication_enabled = true
-  auto_minor_version_upgrade          = true
-  db_subnet_group_name                = aws_db_subnet_group.this.name
-  vpc_security_group_ids              = [aws_security_group.database.id]
-  tags                                = var.tags
+  identifier                  = var.name
+  engine                      = "postgres"
+  engine_version              = var.database.engine_version
+  instance_class              = var.database.instance_class
+  allocated_storage           = var.database.allocated_storage
+  max_allocated_storage       = var.database.max_allocated_storage
+  storage_encrypted           = true
+  multi_az                    = var.database.multi_az
+  backup_retention_period     = var.database.backup_retention_days
+  deletion_protection         = var.database.deletion_protection
+  skip_final_snapshot         = false
+  final_snapshot_identifier   = coalesce(var.database.final_snapshot_name, "${var.name}-final")
+  publicly_accessible         = false
+  username                    = "bae6_admin"
+  manage_master_user_password = true
+  auto_minor_version_upgrade  = true
+  db_subnet_group_name        = aws_db_subnet_group.this.name
+  vpc_security_group_ids      = [aws_security_group.database.id]
+  tags                        = var.tags
 }
 
 resource "aws_iam_role" "runtime" {
@@ -112,6 +111,8 @@ resource "aws_secretsmanager_secret" "this" {
   for_each = local.secrets
   name     = each.value.name
   tags     = var.tags
+
+  recovery_window_in_days = var.secret_recovery_window_days
 }
 
 resource "aws_iam_role_policy" "secrets" {
