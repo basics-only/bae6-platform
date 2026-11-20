@@ -6,6 +6,11 @@ output "database_connection_name" {
   value = google_sql_database_instance.this.connection_name
 }
 
+output "runtime_databases" {
+  description = "Each database-using runtime's own database. Revoke PUBLIC's CONNECT on them and grant only the owner (see the PR notes); Terraform cannot."
+  value       = { for k, d in google_sql_database.runtime : k => d.name }
+}
+
 output "database_private_ip" {
   value = google_sql_database_instance.this.private_ip_address
 }

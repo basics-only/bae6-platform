@@ -7,6 +7,22 @@ mock_provider "google" {
   }
 }
 
+override_resource {
+  target = google_service_account.runtime["ai-gateway"]
+  values = {
+    email = "ai-gateway-sa@bae6-prod.iam.gserviceaccount.com"
+    name  = "projects/bae6-prod/serviceAccounts/ai-gateway-sa@bae6-prod.iam.gserviceaccount.com"
+  }
+}
+
+override_resource {
+  target = google_service_account.runtime["context-data"]
+  values = {
+    email = "context-data-sa@bae6-prod.iam.gserviceaccount.com"
+    name  = "projects/bae6-prod/serviceAccounts/context-data-sa@bae6-prod.iam.gserviceaccount.com"
+  }
+}
+
 variables {
   name       = "bae6"
   project    = "bae6-prod"
@@ -43,8 +59,8 @@ run "database_is_private_tls_only_iam_authenticated_and_protected_by_default" {
   }
 
   assert {
-    condition     = google_sql_database_instance.this.deletion_protection && google_sql_database_instance.this.settings[0].backup_configuration[0].enabled
-    error_message = "The database must be delete-protected and backed up unless explicitly relaxed."
+    condition     = google_sql_database_instance.this.deletion_protection && google_sql_database_instance.this.settings[0].deletion_protection_enabled && google_sql_database_instance.this.settings[0].backup_configuration[0].enabled
+    error_message = "The database must be delete-protected (in Terraform and in the API) and backed up unless explicitly relaxed."
   }
 
   assert {
@@ -71,9 +87,70 @@ run "vertex_and_database_access_go_only_to_runtimes_that_ask" {
   }
 
   assert {
-    condition     = google_sql_user.runtime["ai-gateway"].type == "CLOUD_IAM_SERVICE_ACCOUNT" && google_sql_user.runtime["ai-gateway"].name == "runtime@bae6-prod.iam"
+    condition     = google_sql_user.runtime["ai-gateway"].type == "CLOUD_IAM_SERVICE_ACCOUNT" && google_sql_user.runtime["ai-gateway"].name == "ai-gateway-sa@bae6-prod.iam"
     error_message = "Database users must be IAM service accounts, named without the .gserviceaccount.com suffix."
   }
+
+  assert {
+    condition     = google_project_iam_member.vertex["ai-gateway"].member == "serviceAccount:ai-gateway-sa@bae6-prod.iam.gserviceaccount.com"
+    error_message = "Vertex access must go to the declaring runtime's own account."
+  }
+}
+
+run "database_grants_cover_this_instance_only_and_each_runtime_has_its_own_database" {
+  command = apply
+
+  assert {
+    condition     = alltrue([for g in [google_project_iam_member.database_client["ai-gateway"], google_project_iam_member.database_login["ai-gateway"]] : strcontains(g.condition[0].expression, "projects/bae6-prod/instances/bae6\"")])
+    error_message = "Cloud SQL roles must be conditioned to this module's instance, not the whole project."
+  }
+
+  assert {
+    condition     = google_sql_database.runtime["ai-gateway"].name == "ai_gateway" && !contains(keys(google_sql_database.runtime), "context-data")
+    error_message = "Each database-using runtime gets its own database; others get none."
+  }
+}
+
+run "workload_identity_uses_the_clusters_project_when_it_differs" {
+  command = apply
+
+  variables {
+    cluster_project = "bae6-clusters"
+  }
+
+  assert {
+    condition     = google_service_account_iam_member.workload_identity["context-data"].member == "serviceAccount:bae6-clusters.svc.id.goog[bae6/context-data]"
+    error_message = "The member must name the cluster's own Workload Identity pool."
+  }
+}
+
+run "a_service_account_override_changes_only_the_kubernetes_side" {
+  command = apply
+
+  variables {
+    runtimes = {
+      ai-gateway   = { namespace = "bae6", service_account = "gateway-ksa" }
+      context-data = { namespace = "bae6" }
+    }
+  }
+
+  assert {
+    condition     = google_service_account_iam_member.workload_identity["ai-gateway"].member == "serviceAccount:bae6-prod.svc.id.goog[bae6/gateway-ksa]" && google_service_account_iam_member.workload_identity["ai-gateway"].service_account_id == "projects/bae6-prod/serviceAccounts/ai-gateway-sa@bae6-prod.iam.gserviceaccount.com"
+    error_message = "The override must change the Kubernetes ServiceAccount only."
+  }
+}
+
+run "names_that_could_collide_or_repeat_are_refused" {
+  command = plan
+
+  variables {
+    runtimes = {
+      ai   = { namespace = "bae6", secret_names = ["db--url"] }
+      ai-b = { namespace = "bae6", secret_names = ["x", "x"] }
+    }
+  }
+
+  expect_failures = [var.runtimes]
 }
 
 run "a_runtime_reads_only_its_own_secrets" {
@@ -85,7 +162,7 @@ run "a_runtime_reads_only_its_own_secrets" {
   }
 
   assert {
-    condition     = google_secret_manager_secret.this["ai-gateway/database-url"].secret_id == "bae6-ai-gateway-database-url"
+    condition     = google_secret_manager_secret.this["ai-gateway/database-url"].secret_id == "bae6--ai-gateway--database-url"
     error_message = "Secrets must be namespaced by runtime."
   }
 }

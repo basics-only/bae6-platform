@@ -7,6 +7,12 @@ variable "project" {
   type = string
 }
 
+variable "cluster_project" {
+  description = "Project of the GKE cluster, whose Workload Identity pool the runtimes bind to. Defaults to project."
+  type        = string
+  default     = null
+}
+
 variable "region" {
   type = string
 }
@@ -37,6 +43,19 @@ variable "runtimes" {
     secret_names    = optional(list(string), [])
   }))
   default = {}
+
+  validation {
+    condition = alltrue(concat(
+      [for k in keys(var.runtimes) : can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", k))],
+      [for r in values(var.runtimes) : alltrue([for s in r.secret_names : can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", s))])],
+    ))
+    error_message = "Runtime keys and secret names are lowercase letters and digits joined by single hyphens, so derived ids cannot collide."
+  }
+
+  validation {
+    condition     = alltrue([for r in values(var.runtimes) : length(r.secret_names) == length(toset(r.secret_names))])
+    error_message = "A runtime's secret_names must not repeat."
+  }
 }
 
 variable "labels" {
