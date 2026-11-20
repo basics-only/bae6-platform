@@ -55,6 +55,12 @@ spec:
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if .Values.webIdentity.roleArn }}
+            - name: AWS_ROLE_ARN
+              value: {{ .Values.webIdentity.roleArn | quote }}
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: /var/run/secrets/aws/token
+            {{- end }}
             {{- range .Values.envFromSecrets }}
             - name: {{ .name }}
               valueFrom:
@@ -90,7 +96,21 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.webIdentity.roleArn }}
+            - name: aws-token
+              mountPath: /var/run/secrets/aws
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        {{- if .Values.webIdentity.roleArn }}
+        - name: aws-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.webIdentity.audience | quote }}
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
