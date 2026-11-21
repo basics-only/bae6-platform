@@ -21,6 +21,11 @@
   Identity for Vertex). Static AWS keys work only locally, from a `.env`, under
   `NODE_ENV=development`; the gateway refuses to start with them anywhere else
   (bae6-contracts ADR-0013).
+- Hugging Face has no workload identity, so its tokens are the one provider credential that
+  is stored. Put each in a Kubernetes Secret and reference it through `envFromSecrets` under
+  the name a model's `tokenEnv` gives (`BAE6_HF_TOKEN_*`). Use a fine-grained read token per
+  endpoint, never a personal account token. The gateway sends it only to
+  `router.huggingface.co` or `<name>.endpoints.huggingface.cloud` (bae6-contracts ADR-0015).
 - Values that are secret (database URLs with passwords) go in Kubernetes Secrets, referenced through
   `envFromSecrets`. They are never put in `env`, ConfigMaps, values files in git, or images.
 - In production, Secrets are synced from the cloud secret manager (External Secrets
