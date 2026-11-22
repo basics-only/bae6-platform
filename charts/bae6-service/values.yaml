@@ -46,6 +46,12 @@ serviceAccount:
   # Off unless the runtime calls the Kubernetes API or needs a projected token.
   automountToken: false
 
+# AWS web identity (IRSA-style) for clusters whose OIDC provider IAM trusts, when the EKS
+# webhook does not inject it. Set roleArn to project a token and configure the AWS SDK env.
+webIdentity:
+  roleArn: ""
+  audience: sts.amazonaws.com
+
 podDisruptionBudget:
   # Applied when more than one replica can run.
   minAvailable: 1

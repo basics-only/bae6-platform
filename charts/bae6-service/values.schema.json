@@ -27,6 +27,14 @@
         "maxReplicas": { "type": "integer", "minimum": 1 }
       }
     },
+    "webIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roleArn": { "type": "string", "pattern": "^$|^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$" },
+        "audience": { "type": "string", "minLength": 1 }
+      }
+    },
     "env": { "type": "object", "additionalProperties": { "type": "string" } },
     "envFromSecrets": {
       "type": "array",
